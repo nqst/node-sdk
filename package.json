@@ -1,7 +1,8 @@
 {
   "name": "transloadit",
-  "version": "3.0.2",
+  "version": "4.0.1",
   "description": "Node.js SDK for Transloadit",
+  "type": "module",
   "keywords": [
     "transloadit",
     "encoding",
@@ -11,45 +12,38 @@
     "mp3"
   ],
   "author": "Tim Koschuetzki <tim@transloadit.com>",
-  "packageManager": "yarn@1.22.19+sha1.4ba7fc5c6e704fce2066ecbfb0b0d8976fe62447",
+  "packageManager": "yarn@4.9.4",
   "engines": {
-    "node": ">= 14.16",
-    "yarn": ">= 1.22.19"
+    "node": ">= 20"
   },
   "dependencies": {
-    "debug": "^4.3.1",
-    "form-data": "^3.0.0",
-    "got": "^11.8.1",
-    "into-stream": "^6.0.0",
-    "is-stream": "^2.0.0",
-    "lodash": "^4.17.20",
-    "p-map": "^4.0.0",
-    "tus-js-client": "^3.0.1",
-    "uuid": "^8.3.2"
+    "@aws-sdk/client-s3": "^3.891.0",
+    "@aws-sdk/s3-request-presigner": "^3.891.0",
+    "debug": "^4.4.3",
+    "form-data": "^4.0.4",
+    "got": "14.4.9",
+    "into-stream": "^9.0.0",
+    "is-stream": "^4.0.1",
+    "p-map": "^7.0.3",
+    "tus-js-client": "^4.3.1",
+    "type-fest": "^4.41.0",
+    "zod": "3.25.76"
   },
   "devDependencies": {
-    "@babel/eslint-parser": "^7.15.8",
-    "@babel/eslint-plugin": "^7.13.10",
-    "@types/jest": "^26.0.19",
-    "badge-maker": "^3.3.0",
-    "eslint": "^7.18.0",
-    "eslint-config-prettier": "^8.8.0",
-    "eslint-config-transloadit": "^2.0.0",
-    "eslint-plugin-import": "^2.27.4",
-    "eslint-plugin-jest": "^24.3.3",
-    "eslint-plugin-jsx-a11y": "^6.4.1",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-promise": "^5.1.1",
-    "eslint-plugin-react": "^7.23.1",
-    "eslint-plugin-react-hooks": "^4.2.0",
-    "execa": "5",
-    "jest": "^29.7.0",
-    "nock": "^13.0.5",
+    "@biomejs/biome": "^2.2.4",
+    "@types/debug": "^4.1.12",
+    "@types/temp": "^0.9.4",
+    "@vitest/coverage-v8": "^3.2.4",
+    "badge-maker": "^5.0.2",
+    "dotenv": "^17.2.2",
+    "execa": "9.6.0",
+    "nock": "^14.0.10",
     "npm-run-all": "^4.1.5",
-    "p-retry": "^4.2.0",
-    "prettier": "^2.8.6",
-    "temp": "^0.9.1",
-    "tsd": "^0.25.0"
+    "p-retry": "^7.0.0",
+    "temp": "^0.9.4",
+    "tsx": "4.20.5",
+    "typescript": "5.9.2",
+    "vitest": "^3.2.4"
   },
   "repository": {
     "type": "git",
@@ -59,25 +53,28 @@
     "src": "./src"
   },
   "scripts": {
-    "fix:js": "eslint . --fix",
-    "lint:js": "eslint .",
-    "lint": "npm-run-all --parallel 'lint:*'",
-    "fix": "npm-run-all --serial 'fix:*'",
+    "check": "yarn lint:ts && yarn fix && yarn test:unit",
+    "fix:js": "biome check --write .",
+    "lint:ts": "tsc --build",
+    "fix:js:unsafe": "biome check --write . --unsafe",
+    "lint:js": "biome check .",
+    "lint": "npm-run-all --parallel 'lint:js'",
+    "fix": "npm-run-all --serial 'fix:js'",
     "next:update": "next-update --keep true --tldr",
-    "test-unit": "jest --detectOpenHandles --coverage ./test/unit",
-    "test-integration": "jest --verbose --detectOpenHandles --runInBand ./test/integration",
-    "tsd": "tsd",
-    "test-all": "npm run tsd && jest --detectOpenHandles --runInBand --coverage --coverageReporters json lcov text clover json-summary --forceExit",
-    "test": "npm run tsd && npm run test-unit",
-    "fix:formatting": "prettier --write .",
-    "lint:formatting": "prettier --check ."
+    "prepack": "rm -f tsconfig.tsbuildinfo tsconfig.build.tsbuildinfo && tsc --build tsconfig.build.json",
+    "test:unit": "vitest run --coverage ./test/unit",
+    "test:integration": "vitest run ./test/integration",
+    "test:all": "vitest run --coverage",
+    "test": "yarn test:unit"
   },
   "license": "MIT",
-  "main": "./index",
-  "types": "types/index.d.ts",
+  "main": "./dist/Transloadit.js",
+  "exports": {
+    ".": "./dist/Transloadit.js",
+    "./package.json": "./package.json"
+  },
   "files": [
-    "index.js",
-    "src",
-    "types/index.d.ts"
+    "dist",
+    "src"
   ]
 }

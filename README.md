@@ -1,3 +1,6 @@
+[![Build Status](https://github.com/transloadit/node-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/transloadit/node-sdk/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/transloadit/node-sdk/branch/main/graph/badge.svg)](https://codecov.io/gh/transloadit/node-sdk)
+
 <a href="https://transloadit.com/?utm_source=github&utm_medium=referral&utm_campaign=sdks&utm_content=node_sdk">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://assets.transloadit.com/assets/images/sponsorships/logo-dark.svg">
@@ -23,13 +26,11 @@ This is a **Node.js** SDK to make it easy to talk to the
 
 ## Requirements
 
-- [Node.js](https://nodejs.org/en/) version 14 or newer
+- [Node.js](https://nodejs.org/en/) version 20 or newer
 - [A Transloadit account](https://transloadit.com/signup/) ([free signup](https://transloadit.com/pricing/))
 - [Your API credentials](https://transloadit.com/c/template-credentials) (`authKey`, `authSecret`)
 
 ## Install
-
-**Note: This documentation is for the current version (v3)**. Looking for [v2 docs?](https://github.com/transloadit/node-sdk/tree/v2) Looking for [breaking changes from v2 to v3?](https://github.com/transloadit/node-sdk/releases/tag/v3.0.0)
 
 Inside your project, type:
 
@@ -48,52 +49,48 @@ npm install --save transloadit
 The following code will upload an image and resize it to a thumbnail:
 
 ```javascript
-const Transloadit = require('transloadit')
+import { Transloadit } from 'transloadit'
 
 const transloadit = new Transloadit({
   authKey: 'YOUR_TRANSLOADIT_KEY',
   authSecret: 'YOUR_TRANSLOADIT_SECRET',
 })
 
-;(async () => {
-  try {
-    const options = {
-      files: {
-        file1: '/PATH/TO/FILE.jpg',
-      },
-      params: {
-        steps: {
-          // You can have many Steps. In this case we will just resize any inputs (:original)
-          resize: {
-            use: ':original',
-            robot: '/image/resize',
-            result: true,
-            width: 75,
-            height: 75,
-          },
+try {
+  const options = {
+    files: {
+      file1: '/PATH/TO/FILE.jpg',
+    },
+    params: {
+      steps: {
+        // You can have many Steps. In this case we will just resize any inputs (:original)
+        resize: {
+          use: ':original',
+          robot: '/image/resize',
+          result: true,
+          width: 75,
+          height: 75,
         },
-        // OR if you already created a template, you can use it instead of "steps":
-        // template_id: 'YOUR_TEMPLATE_ID',
       },
-      waitForCompletion: true, // Wait for the Assembly (job) to finish executing before returning
-    }
-
-    const status = await transloadit.createAssembly(options)
-
-    if (status.results.resize) {
-      console.log('✅ Success - Your resized image:', status.results.resize[0].ssl_url)
-    } else {
-      console.log(
-        "❌ The Assembly didn't produce any output. Make sure you used a valid image file"
-      )
-    }
-  } catch (err) {
-    console.error('❌ Unable to process Assembly.', err)
-    if (err.assemblyId) {
-      console.error(`💡 More info: https://transloadit.com/assemblies/${err.assemblyId}`)
-    }
+      // OR if you already created a template, you can use it instead of "steps":
+      // template_id: 'YOUR_TEMPLATE_ID',
+    },
+    waitForCompletion: true, // Wait for the Assembly (job) to finish executing before returning
   }
-})()
+
+  const status = await transloadit.createAssembly(options)
+
+  if (status.results.resize) {
+    console.log('✅ Success - Your resized image:', status.results.resize[0].ssl_url)
+  } else {
+    console.log("❌ The Assembly didn't produce any output. Make sure you used a valid image file")
+  }
+} catch (err) {
+  console.error('❌ Unable to process Assembly.', err)
+  if (err instanceof ApiError && err.assemblyId) {
+    console.error(`💡 More info: https://transloadit.com/assemblies/${err.assemblyId}`)
+  }
+}
 ```
 
 You can find [details about your executed Assemblies here](https://transloadit.com/assemblies).
@@ -113,7 +110,7 @@ For more example use cases and information about the available robots and their 
 
 ## API
 
-These are the public methods on the `Transloadit` object and their descriptions. The methods are based on the [Transloadit API](https://transloadit.com/docs/api/). See also [TypeScript definitions](types/index.d.ts).
+These are the public methods on the `Transloadit` object and their descriptions. The methods are based on the [Transloadit API](https://transloadit.com/docs/api/).
 
 Table of contents:
 
@@ -138,6 +135,7 @@ The `options` object can contain the following keys:
 - `maxRetries` (default `5`) - see [Rate limiting & auto retry](#rate-limiting--auto-retry)
 - `gotRetry` (default `0`) - see [Rate limiting & auto retry](#rate-limiting--auto-retry)
 - `timeout` (default `60000`: 1 minute) - the timeout (in milliseconds) for all requests (except `createAssembly`)
+- `validateResponses` (default `false`)
 
 ### Assemblies
 
@@ -389,33 +387,64 @@ Calculates a signature for the given `params` JSON object. If the `params` objec
 
 This function returns an object with the key `signature` (containing the calculated signature string) and a key `params`, which contains the stringified version of the passed `params` object (including the set expires and authKey keys).
 
+#### getSignedSmartCDNUrl(params)
+
+Constructs a signed Smart CDN URL, as defined in the [API documentation](https://transloadit.com/docs/topics/signature-authentication/#smart-cdn). `params` must be an object with the following properties:
+
+- `workspace` - Workspace slug (required)
+- `template` - Template slug or template ID (required)
+- `input` - Input value that is provided as `${fields.input}` in the template (required)
+- `urlParams` - Object with additional parameters for the URL query string (optional)
+- `expiresAt` - Expiration timestamp of the signature in milliseconds since UNIX epoch. Defaults to 1 hour from now. (optional)
+
+Example:
+
+```js
+const client = new Transloadit({ authKey: 'foo_key', authSecret: 'foo_secret' })
+const url = client.getSignedSmartCDNUrl({
+  workspace: 'foo_workspace',
+  template: 'foo_template',
+  input: 'foo_input',
+  urlParams: {
+    foo: 'bar',
+  },
+})
+
+// url is:
+// https://foo_workspace.tlcdn.com/foo_template/foo_input?auth_key=foo_key&exp=1714525200000&foo=bar&sig=sha256:9548915ec70a5f0d05de9497289e792201ceec19a526fe315f4f4fd2e7e377ac
+```
+
 ### Errors
 
-Errors from Node.js will be passed on and we use [GOT](https://github.com/sindresorhus/got) for HTTP requests and errors from there will also be passed on. When the HTTP response code is not 200, the error will be a `Transloadit.HTTPError`, which is a [got.HTTPError](https://github.com/sindresorhus/got#errors)) with some additional properties:
+Any errors originating from Node.js will be passed on and we use [GOT](https://github.com/sindresorhus/got) v11 for HTTP requests. [Errors from `got`](https://github.com/sindresorhus/got/tree/v11.8.6?tab=readme-ov-file#errors) will also be passed on, _except_ the `got.HTTPError` which will be replaced with a `transloadit.ApiError`, which will have its `cause` property set to the instance of the original `got.HTTPError`. `transloadit.ApiError` has these properties:
 
-- `HTTPError.response?.body` the JSON object returned by the server along with the error response (**note**: `HTTPError.response` will be `undefined` for non-server errors)
-- `HTTPError.transloaditErrorCode` alias for `HTTPError.response.body.error` ([View all error codes](https://transloadit.com/docs/api/response-codes/#error-codes))
-- `HTTPError.assemblyId` (alias for `HTTPError.response.body.assembly_id`, if the request regards an [Assembly](https://transloadit.com/docs/api/assemblies-assembly-id-get/))
+- `code` (`string`) - [The Transloadit API error code](https://transloadit.com/docs/api/response-codes/#error-codes).
+- `rawMessage` (`string`) - A textual representation of the Transloadit API error.
+- `reason` (`string`) - Additional information about the Transloadit API error.
+- `assemblyId`: (`string`) - If the request is related to an assembly, this will be the ID of the assembly.
+- `assemblySslUrl` (`string`) - If the request is related to an assembly, this will be the SSL URL to the assembly .
 
 To identify errors you can either check its props or use `instanceof`, e.g.:
 
 ```js
-catch (err) {
-  if (err instanceof Transloadit.TimeoutError) {
+try {
+  await transloadit.createAssembly(options)
+} catch (err) {
+  if (err instanceof got.TimeoutError) {
     return console.error('The request timed out', err)
   }
   if (err.code === 'ENOENT') {
     return console.error('Cannot open file', err)
   }
-  if (err.transloaditErrorCode === 'ASSEMBLY_INVALID_STEPS') {
+  if (err instanceof ApiError && err.code === 'ASSEMBLY_INVALID_STEPS') {
     return console.error('Invalid Assembly Steps', err)
   }
 }
 ```
 
-**Note:** Assemblies that have an error status (`assembly.error`) will only result in an error thrown from `createAssembly` and `replayAssembly`. For other Assembly methods, no errors will be thrown, but any error can be found in the response's `error` property
+**Note:** Assemblies that have an error status (`assembly.error`) will only result in an error being thrown from `createAssembly` and `replayAssembly`. For other Assembly methods, no errors will be thrown, but any error can be found in the response's `error` property (also `ApiError.code`).
 
-- [More information on Transloadit errors (`transloaditErrorCode`)](https://transloadit.com/docs/api/response-codes/#error-codes)
+- [More information on Transloadit errors (`ApiError.code`)](https://transloadit.com/docs/api/response-codes/#error-codes)
 - [More information on request errors](https://github.com/sindresorhus/got#errors)
 
 ### Rate limiting & auto retry
@@ -426,11 +455,15 @@ There are three kinds of retries:
 
 All functions of the client automatically obey all rate limiting imposed by Transloadit (e.g. `RATE_LIMIT_REACHED`), so there is no need to write your own wrapper scripts to handle rate limits. The SDK will by default retry requests **5 times** with auto back-off (See `maxRetries` constructor option).
 
-#### GOT HTTP retries (`gotRetry`, default `0`)
+#### GOT HTTP retries (`gotRetry`, default `{ limit: 0 }`)
 
 Because we use [got](https://github.com/sindresorhus/got) under the hood, you can pass a `gotRetry` constructor option which is passed on to `got`. This offers great flexibility for handling retries on network errors and HTTP status codes with auto back-off. See [`got` `retry` object documentation](https://github.com/sindresorhus/got/blob/main/documentation/7-retry.md).
 
 **Note that the above `maxRetries` option does not affect the `gotRetry` logic.**
+
+#### Validate API responses (`validateResponses`, default `false`)
+
+As we have ported the JavaScript SDK to TypeScript in v4, we are now also validating API responses using `zod` schemas. Having schema validation enabled (`true`), guarantees that the data returned by the SDK adheres to the TypeScript types of this SDK. However we are still working on improving the schemas and they are not yet 100% complete. This means that if you hit a bug in the schemas, a `zod` schema validation error will be thrown. If you encounter such an error, please report it and we will fix it as soon as possible. If you set this option to `false`, schema validation will be disabled, and you won't get any such errors, however the TypeScript types will not protect you should such a bug be encountered.
 
 #### Custom retry logic
 
@@ -451,31 +484,18 @@ DEBUG=transloadit* node examples/template_api.js
 
 - [Mikael Finstad](https://github.com/mifi)
 
-## Contributing
-
-We'd be happy to accept pull requests. If you plan on working on something big, please first drop us a line!
-
-### Testing
-
-Check your sources for linting errors via `npm run lint`, and unit tests, and run them via `npm test`
-
-### Releasing
-
-1. Install [np](https://github.com/sindresorhus/np): `npm i -g np`
-2. Wait for [tests to succeed](https://github.com/transloadit/node-sdk/actions).
-3. Run `np` and follow instructions.
-4. When successful add [release notes](https://github.com/transloadit/node-sdk/releases).
-
-### Change log
+### Changelog
 
 See [Releases](https://github.com/transloadit/node-sdk/releases)
 
-### Convenience
+## Attribution
 
-If you come from a unix background and fancy faster auto-complete, you'll be delighted to know that all npm scripts are also accessible under `make`, via fakefile.
+Thanks to [Ian Hansen](https://github.com/supershabam) for donating the `transloadit` npm name. You can still access his code under [`v0.0.0`](https://www.npmjs.com/package/transloadit/v/0.0.0).
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © [Transloadit](https://transloadit.com)
 
-Thanks to [Ian Hansen](https://github.com/supershabam) for donating the `transloadit` npm name. You can still access his code under `v0.0.0`.
+## Development
+
+See [CONTRIBUTING](./CONTRIBUTING.md).
